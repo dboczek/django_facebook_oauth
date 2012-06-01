@@ -7,3 +7,6 @@ class CreateUserForm(UserCreationForm):
     class Meta:
         model = User
 
+    def __init__(self, request, *args, **kw):
+        super(CreateUserForm, self).__init__(*args, **kw)
+

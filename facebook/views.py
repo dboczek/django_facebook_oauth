@@ -64,7 +64,7 @@ def facebook_login(request, template_name='facebook/login.html',
 
     if request.method == 'POST':
         fbprofile = fb.get_profile()
-        form = form_class(data=request.POST, initial=fbprofile)
+        form = form_class(request, data=request.POST, initial=fbprofile)
         if form.is_valid():
             form.save()
             user = authenticate(facebook_uid=fb.uid)
@@ -88,7 +88,7 @@ def facebook_login(request, template_name='facebook/login.html',
             return redirect(success_url)
 
         fbprofile = fb.get_profile()
-        form = form_class(initial=fbprofile)
+        form = form_class(request, initial=fbprofile)
 
     ctx = {
             'form': form,
