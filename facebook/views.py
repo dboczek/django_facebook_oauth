@@ -1,7 +1,7 @@
 from django.shortcuts import redirect
 from django.conf import settings
 from django.contrib.auth import authenticate, login
-from django.core.urlresolvers import reverse, reverse_lazy
+from django.core.urlresolvers import reverse
 from django.db import transaction
 from django.shortcuts import render_to_response
 from django.template import RequestContext
@@ -84,7 +84,9 @@ class FacebookLoginView(FormView):
         return super(FacebookLoginView, self).get_template_names()
 
     def get_initial(self):
-        return self.fbproxy.get_profile()
+        if self.fbproxy.authorized():
+            return self.fbproxy.get_profile()
+        return {}
 
     def get_form(self, form_class):
         return form_class(self.request, **self.get_form_kwargs())
@@ -129,13 +131,14 @@ class FacebookLoginView(FormView):
         return redirect(self.get_success_url())
 
     def get(self, *args, **kw):
-        user = authenticate(facebook_uid=self.fbproxy.uid)
-        if user and user.is_active:
-            # user authenticated
-            return self.login_user(user)
-        elif user:
-            # user has inactive account
-            return self.inactive_user(user)
+        if self.fbproxy.authorized():
+            user = authenticate(facebook_uid=self.fbproxy.uid)
+            if user and user.is_active:
+                # user authenticated
+                return self.login_user(user)
+            elif user:
+                # user has inactive account
+                return self.inactive_user(user)
         return super(FacebookLoginView, self).get(*args, **kw)
 
     def form_valid(self, form):
