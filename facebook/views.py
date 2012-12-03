@@ -43,6 +43,7 @@ def catch_connection_error(func, template_name='facebook/failed.html'):
             if "auth_user_username_key" in e.message\
             or "facebook_facebookprofile_user_id_key" in e.message:
                 return redirect(reverse('facebook-auth'))
+            raise
         ctx = {
             'message': message,
             }
