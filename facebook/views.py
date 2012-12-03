@@ -2,7 +2,7 @@ from django.shortcuts import redirect
 from django.conf import settings
 from django.contrib.auth import authenticate, login
 from django.core.urlresolvers import reverse
-from django.db import transaction
+from django.db import transaction, IntegrityError
 from django.shortcuts import render_to_response
 from django.template import RequestContext
 from django.utils.decorators import method_decorator
@@ -38,6 +38,11 @@ def catch_connection_error(func, template_name='facebook/failed.html'):
             message = _('Could not connect to Facebook')
         except GraphAPIError, e:
             message = unicode(e)
+        except IntegrityError, e:
+            # retrying user login in case of race condition
+            if "auth_user_username_key" in e.message\
+            or "facebook_facebookprofile_user_id_key" in e.message:
+                return redirect(reverse('facebook-auth'))
         ctx = {
             'message': message,
             }
