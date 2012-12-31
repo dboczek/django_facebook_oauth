@@ -21,7 +21,7 @@ def redirect_to_facebook_auth(request):
     args = {
         'client_id': settings.FACEBOOK_APP_ID,
         'scope': settings.FACEBOOK_SCOPE,
-        'redirect_uri': request.build_absolute_uri(reverse('facebook-login')),
+        'redirect_uri': settings.get('FACEBOOK_REDIRECT_URI', request.build_absolute_uri(reverse('facebook-login'))),
     }
     return redirect('https://www.facebook.com/dialog/oauth?' + urllib.urlencode(args))
 
