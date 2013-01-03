@@ -165,7 +165,7 @@ class FacebookLoginView(FormView):
 
     def get_success_url(self, *args, **kwargs):
         next = self.request.GET.get('next',None)
-        success_url = super(FacebookLoginView, self).get_success_url(self, *args, **kwargs)
+        success_url = super(FacebookLoginView, self).get_success_url(*args, **kwargs)
         if next:
             parsed_url = urlparse.urlparse(success_url)
             query = urlparse.parse_qs(parsed_url.query)
