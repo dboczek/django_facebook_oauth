@@ -12,16 +12,25 @@ from forms import CreateUserForm
 import facebook
 from fbgraph import GraphAPIError
 import urllib
+import urlparse
 import signals
 
 
 def redirect_to_facebook_auth(request):
     """ First step of process, redirects user to facebook, which redirects to authentication_callback. """
-
+    next = request.GET.get('next',None)
+    redirect_uri = getattr(settings, 'FACEBOOK_REDIRECT_URI', request.build_absolute_uri(reverse('facebook-login')))
+    parsed_uri = urlparse.urlparse(redirect_uri)
+    query = urlparse.parse_qs(parsed_uri.query)
+    if next:
+        query.update({'next': next})
+    parsed_uri = list(parsed_uri)
+    parsed_uri[4] = urllib.urlencode(query)
+    redirect_uri = urlparse.urlunparse(parsed_uri)
     args = {
         'client_id': settings.FACEBOOK_APP_ID,
         'scope': settings.FACEBOOK_SCOPE,
-        'redirect_uri': getattr(settings, 'FACEBOOK_REDIRECT_URI', request.build_absolute_uri(reverse('facebook-login'))),
+        'redirect_uri': redirect_uri,
     }
     return redirect('https://www.facebook.com/dialog/oauth?' + urllib.urlencode(args))
 
@@ -54,21 +63,21 @@ def catch_connection_error(func, template_name='facebook/failed.html'):
 def facebook_inactive_user(request, template_name=None):
     ctx = {}
     return render_to_response(template_name or 'facebook/inactive_user.html',
-            RequestContext(request, ctx))
+        RequestContext(request, ctx))
 
 
 class FacebookLoginView(FormView):
     form_class = CreateUserForm
     success_url = settings.LOGIN_REDIRECT_URL
-    inactive_account_url = None 
-    confirmation_url = None 
+    inactive_account_url = None
+    confirmation_url = None
     facebook_login_url = None
     fail_template_name = 'facebook/failed.html'
     template_name = 'facebook/login.html'
 
     def get_facebook_proxy(self, request):
         return facebook.create_facebook_proxy(request,
-                request.build_absolute_uri(self.get_facebook_login_url()))
+            request.build_absolute_uri(self.get_facebook_login_url()))
 
     @method_decorator(transaction.commit_on_success)
     @method_decorator(catch_connection_error)
@@ -123,7 +132,7 @@ class FacebookLoginView(FormView):
         called when logging user
         """
         signals.facebook_login.send(sender=facebook_login,
-                instance=user, graph=self.fbproxy.graph)
+            instance=user, graph=self.fbproxy.graph)
         login(self.request, user)
         return redirect(self.get_success_url())
 
@@ -132,7 +141,7 @@ class FacebookLoginView(FormView):
         called when connecting new user
         """
         login(self.request, user)
-        signals.facebook_connect.send(sender=facebook_login, instance=user, 
+        signals.facebook_connect.send(sender=facebook_login, instance=user,
             fbprofile=self.fbproxy.get_profile(), graph=self.fbproxy.graph)
         return redirect(self.get_success_url())
 
@@ -153,6 +162,18 @@ class FacebookLoginView(FormView):
         if user and user.is_active:
             return self.connect_user(user, form)
         return self.confirm_user(user)
+
+    def get_success_url(self, *args, **kwargs):
+        next = self.request.GET.get('next',None)
+        success_url = super(FacebookLoginView, self).get_success_url(self, *args, **kwargs)
+        if next:
+            parsed_url = urlparse.urlparse(success_url)
+            query = urlparse.parse_qs(parsed_url.query)
+            query.update(urllib.urlencode({'next': next}))
+            parsed_url = list(parsed_url)
+            parsed_url[4] = query
+            success_url = urllib.urlencode(parsed_url)
+        return success_url
 
 
 
