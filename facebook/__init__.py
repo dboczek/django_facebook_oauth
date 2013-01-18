@@ -1,5 +1,6 @@
 import fbgraph
 
+class FacebookException(Exception): pass
 
 class Facebook(object):
     """
@@ -32,8 +33,17 @@ class Facebook(object):
             
     def fetch_access_token(self, *args, **kw):
         self.graph.fetch_access_token(*args, **kw)
+        self.fetch_uid_if_none()
+        return self.graph.access_token
+
+
+    def fetch_uid_if_none(self):
         if not self.uid and self.graph.access_token:
             self.uid = self.get_user_id()
+
+    def set_access_token(self, access_token):
+        self.graph.access_token = access_token
+        self.fetch_uid_if_none()
 
     def authorized(self):
         return bool(self.uid)
@@ -66,12 +76,19 @@ def create_facebook_proxy(request, redirect_uri=''):
         if not redirect_uri:
             raise ValueError('Redirect URI is required')
         proxy = Facebook(url=facebook_url)
-        proxy.fetch_access_token(
-                code=request.GET['code'], 
-                app_id=settings.FACEBOOK_APP_ID,
-                app_secret=settings.FACEBOOK_APP_SECRET,
-                redirect_uri=redirect_uri
-            )
+        access_token = request.session.get('FACEBOOK_ACCESS_TOKEN')
+        session_code = request.session.get('FACEBOOK_CODE')
+        if request.GET['code'] != session_code:
+            access_token = proxy.fetch_access_token(
+                    code=request.GET['code'],
+                    app_id=settings.FACEBOOK_APP_ID,
+                    app_secret=settings.FACEBOOK_APP_SECRET,
+                    redirect_uri=redirect_uri
+                )
+        else:
+            proxy.set_access_token(access_token)
+        request.session['FACEBOOK_ACCESS_TOKEN'] = access_token
+        request.session['FACEBOOK_CODE'] = code=request.GET['code']
         return proxy
 
     # cookie method

@@ -14,19 +14,24 @@ from fbgraph import GraphAPIError
 import urllib
 import urlparse
 import signals
+import logging
+
+log = logging.getLogger(__name__)
+
+def url_with_params(url, **params):
+    url_parts = list(urlparse.urlparse(url))
+    query = urlparse.parse_qs(url_parts[4])
+    query.update(params)
+    url_parts[4] = urllib.urlencode(query)
+    return urlparse.urlunparse(url_parts)
 
 
 def redirect_to_facebook_auth(request):
     """ First step of process, redirects user to facebook, which redirects to authentication_callback. """
     next = request.GET.get('next',None)
     redirect_uri = getattr(settings, 'FACEBOOK_REDIRECT_URI', request.build_absolute_uri(reverse('facebook-login')))
-    parsed_uri = urlparse.urlparse(redirect_uri)
-    query = urlparse.parse_qs(parsed_uri.query)
     if next:
-        query.update({'next': next})
-    parsed_uri = list(parsed_uri)
-    parsed_uri[4] = urllib.urlencode(query)
-    redirect_uri = urlparse.urlunparse(parsed_uri)
+        redirect_uri = url_with_params(redirect_uri, next=next)
     args = {
         'client_id': settings.FACEBOOK_APP_ID,
         'scope': settings.FACEBOOK_SCOPE,
@@ -45,8 +50,10 @@ def catch_connection_error(func, template_name='facebook/failed.html'):
             return func(request, *args, **kw)
         except (IOError, ValueError):
             message = _('Could not connect to Facebook')
+            log.exception("Facebook Connection Error")
         except GraphAPIError, e:
             message = unicode(e)
+            log.exception("Facebook Connection Error")
         except IntegrityError, e:
             # retrying user login in case of race condition
             if "auth_user_username_key" in e.message\
@@ -77,7 +84,7 @@ class FacebookLoginView(FormView):
 
     def get_facebook_proxy(self, request):
         return facebook.create_facebook_proxy(request,
-            request.build_absolute_uri(self.get_facebook_login_url()))
+            request.build_absolute_uri(self.get_facebook_login_url(request)))
 
     @method_decorator(transaction.commit_on_success)
     @method_decorator(catch_connection_error)
@@ -109,8 +116,12 @@ class FacebookLoginView(FormView):
     def get_inactive_account_url(self):
         return self.inactive_account_url or reverse('facebook-inactive-user')
 
-    def get_facebook_login_url(self):
-        return self.facebook_login_url or reverse('facebook-login')
+    def get_facebook_login_url(self, request):
+        next = request.GET.get('next', None)
+        redirect_uri = self.facebook_login_url or getattr(settings, 'FACEBOOK_REDIRECT_URI', request.build_absolute_uri(reverse('facebook-login')))
+        if next:
+            redirect_uri = url_with_params(redirect_uri, next=next)
+        return redirect_uri
 
     def get_confirmation_url(self):
         return self.confirmation_url or self.get_inactive_account_url()
@@ -164,17 +175,7 @@ class FacebookLoginView(FormView):
         return self.confirm_user(user)
 
     def get_success_url(self, *args, **kwargs):
-        next = self.request.GET.get('next',None)
-        success_url = super(FacebookLoginView, self).get_success_url(*args, **kwargs)
-        if next:
-            parsed_url = urlparse.urlparse(success_url)
-            query = urlparse.parse_qs(parsed_url.query)
-            query.update(urllib.urlencode({'next': next}))
-            parsed_url = list(parsed_url)
-            parsed_url[4] = query
-            success_url = urllib.urlencode(parsed_url)
-        return success_url
-
+        return self.request.GET.get('next', None) or super(FacebookLoginView, self).get_success_url(*args, **kwargs)
 
 
 facebook_login = FacebookLoginView.as_view()

@@ -178,7 +178,7 @@ class GraphAPI(object):
             file.close()
         if response.get("error"):
             raise GraphAPIError(response["error"]["type"],
-                                response["error"]["message"])
+                response["error"]["message"])
         return response
 
     def fetch_access_token(self, code, app_id, app_secret, redirect_uri=''):
@@ -201,10 +201,19 @@ class GraphAPI(object):
             self.access_token = data['access_token'][-1]
             return self.access_token
         except (KeyError, IndexError):
-            return None
+            try:
+                response = _parse_json(response)
+            except:
+                raise GraphAPIAccessTokenError('Can\'t parse error response as JSON: "%s"' % response)
+            raise GraphAPIAccessTokenError(response["error"]["type"], response["error"]["message"])
 
 
 class GraphAPIError(Exception):
+    def __init__(self, type, message):
+        Exception.__init__(self, message)
+        self.type = type
+
+class GraphAPIAccessTokenError(Exception):
     def __init__(self, type, message):
         Exception.__init__(self, message)
         self.type = type
