@@ -83,7 +83,7 @@ class GraphAPI(object):
     """
     def __init__(self, access_token=None, url=None):
         self.access_token = access_token
-        self.url = url or 'https://graph.facebook.com/'
+        self.url = url or 'https://graph.facebook.com/v2.2/'
 
     def get_object(self, id, **args):
         """Fetchs the given object from the graph."""
@@ -193,7 +193,7 @@ class GraphAPI(object):
             redirect_uri=redirect_uri,
         )
 
-        response = urllib.urlopen(self.url + '/oauth/access_token' + "?" +
+        response = urllib.urlopen(self.url + 'oauth/access_token' + "?" +
                           urllib.urlencode(args)).read()
         data = urlparse.parse_qs(response)
 
