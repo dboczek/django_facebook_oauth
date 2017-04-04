@@ -83,7 +83,7 @@ class GraphAPI(object):
     """
     def __init__(self, access_token=None, url=None):
         self.access_token = access_token
-        self.url = url or 'https://graph.facebook.com/v2.2/'
+        self.url = url or 'https://graph.facebook.com/v2.3/'
 
     def get_object(self, id, **args):
         """Fetchs the given object from the graph."""
@@ -195,16 +195,15 @@ class GraphAPI(object):
 
         response = urllib.urlopen(self.url + 'oauth/access_token' + "?" +
                           urllib.urlencode(args)).read()
-        data = urlparse.parse_qs(response)
+        try:
+            data = _parse_json(response)
+        except:
+            raise GraphAPIAccessTokenError('Can\'t parse error response as JSON: "%s"' % response)
 
         try:
-            self.access_token = data['access_token'][-1]
+            self.access_token = data['access_token']
             return self.access_token
         except (KeyError, IndexError):
-            try:
-                response = _parse_json(response)
-            except:
-                raise GraphAPIAccessTokenError('Can\'t parse error response as JSON: "%s"' % response)
             raise GraphAPIAccessTokenError(response["error"]["type"], response["error"]["message"])
 
 
